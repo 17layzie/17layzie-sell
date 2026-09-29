@@ -1,6 +1,32 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
+<!-- Pokus o útěk z TikTok in-app prohlížeče do skutečného prohlížeče (Chrome/Safari).
+     Na Androidu funguje spolehlivě (přes intent:// na Chrome).
+     Na iOS je to nejisté — Apple starší triky postupně vypínal, tak je to jen "zkus, neuškodí". -->
+<script>
+(function(){
+  try{
+    var ua = navigator.userAgent || "";
+    var isTikTok = /musical_ly|tiktok|bytedance/i.test(ua);
+    if(!isTikTok) return;
+    if(sessionStorage.getItem('escapedTikTok')) return;
+    sessionStorage.setItem('escapedTikTok','1');
+
+    var url = location.href;
+    var bare = url.replace(/^https?:\/\//,'');
+    var isAndroid = /Android/i.test(ua);
+    var isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+    if(isAndroid){
+      location.href = 'intent://' + bare + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(url) + ';end;';
+    } else if(isIOS){
+      location.href = 'x-safari-https://' + bare;
+    }
+  }catch(e){}
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>17layzie — Výkup CS2 skinů</title>
@@ -42,17 +68,54 @@
       calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
+  /* pozadí: skoro černý obrázek + barevný obrázek, který odhalují velké rozmazané bloby */
   .bg{
     position:fixed;
+    inset:0;
+    z-index:-1;
+    overflow:hidden;
+    background:#0a0a0a;
+    pointer-events:none;
+    user-select:none;
+  }
+  .bg-dark, .bg-color{
+    position:absolute;
     inset:0;
     width:100%;
     height:100%;
     object-fit:cover;
     object-position:center;
-    z-index:-1;
-    pointer-events:none;
-    user-select:none;
   }
+  .bg-reveal{
+    position:absolute;
+    inset:0;
+    isolation:isolate;
+    background:#000;
+    mix-blend-mode:screen;
+    opacity:0;
+    transition:opacity 1.8s ease;
+  }
+  .bg-reveal.on{opacity:1;}
+  .bg-color{mix-blend-mode:multiply;}
+  .blob{
+    position:absolute;
+    left:calc(var(--s) / -2);
+    top:calc(var(--s) / -2);
+    width:var(--s);
+    height:var(--s);
+    border-radius:50%;
+    background:radial-gradient(closest-side, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.4) 40%, rgba(255,255,255,0) 100%);
+    translate:var(--x0) 0;
+    transform:translateY(var(--y0));
+    will-change:translate, transform, scale;
+    animation:blobX var(--dx) ease-in-out infinite alternate, blobY var(--dy) ease-in-out infinite alternate, blobS var(--ds) ease-in-out infinite alternate;
+  }
+  .blob.b1{--s:72vmax; --x0:12vw;  --x1:88vw;  --y0:8vh;   --y1:70vh;  --dx:47s; --dy:61s; --ds:29s;}
+  .blob.b2{--s:56vmax; --x0:95vw;  --x1:10vw;  --y0:95vh;  --y1:20vh;  --dx:59s; --dy:43s; --ds:37s;}
+  .blob.b3{--s:88vmax; --x0:40vw;  --x1:105vw; --y0:-5vh;  --y1:100vh; --dx:71s; --dy:53s; --ds:41s;}
+  @keyframes blobX{from{translate:var(--x0) 0;} to{translate:var(--x1) 0;}}
+  @keyframes blobY{from{transform:translateY(var(--y0));} to{transform:translateY(var(--y1));}}
+  @keyframes blobS{from{scale:0.82;} to{scale:1.18;}}
 
   .page{
     width:100%;
@@ -141,6 +204,7 @@
     .headline{animation:none; background-position:50% 0;}
     .btn.primary::before, .btn.steam::before{animation:none;}
     .links > *{animation:none;}
+    .blob{animation:none;}
   }
 
   /* buttons */
@@ -287,7 +351,33 @@
 
   </main>
 
-  <!-- POZADÍ: soubor "background.png" ve stejné složce jako tento HTML -->
-  <img class="bg" alt="" aria-hidden="true" src="background.png" onerror="this.remove()">
+  <!-- POZADÍ (soubory ve stejné složce jako tento HTML):
+       background.png        = skoro černé pozadí
+       background-color.png  = barevné pozadí, které se ukazuje jen tam, kudy projedou bloby -->
+  <div class="bg" aria-hidden="true">
+    <img class="bg-dark" src="background.png" alt="" onerror="this.remove()">
+    <div class="bg-reveal">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+      <img class="bg-color" src="background-color.png" alt="" onload="this.parentNode.classList.add('on')" onerror="this.parentNode.remove()">
+    </div>
+  </div>
+
+  <script>
+    // při každém načtení jiná startovní poloha a mírně jiné tempo blobů
+    (function(){
+      var r=function(a,b){return a+Math.random()*(b-a);};
+      document.querySelectorAll('.blob').forEach(function(b){
+        var dx=r(45,75), dy=r(40,70), ds=r(25,45);
+        b.style.setProperty('--dx',dx+'s');
+        b.style.setProperty('--dy',dy+'s');
+        b.style.setProperty('--ds',ds+'s');
+        b.style.animationDelay=(-r(0,dx*2))+'s,'+(-r(0,dy*2))+'s,'+(-r(0,ds*2))+'s';
+      });
+      var c=document.querySelector('.bg-color');
+      if(c && c.complete && c.naturalWidth) c.parentNode.classList.add('on');
+    })();
+  </script>
 </body>
 </html>
